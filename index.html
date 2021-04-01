@@ -1,0 +1,335 @@
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="google" content="notranslate">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mini.css/3.0.1/mini-default.min.css">
+
+<script src="wasm/binjgb.js"></script>
+<script src="js/emulator.js"></script>
+<style>
+select, input {
+    width: 100%
+}
+</style>
+
+<script>
+"use strict";
+
+var REG_NAME = {
+    0xFF10: "rNR10", 0xFF11: "rNR11", 0xFF12: "rNR12", 0xFF13: "rNR13", 0xFF14: "rNR14",
+    0xFF16: "rNR21", 0xFF17: "rNR22", 0xFF18: "rNR23", 0xFF19: "rNR24",
+    0xFF1A: "rNR30", 0xFF1B: "rNR31", 0xFF1C: "rNR32", 0xFF1D: "rNR33", 0xFF1E: "rNR34",
+    0xFF20: "rNR41", 0xFF21: "rNR42", 0xFF22: "rNR43", 0xFF23: "rNR44",
+}
+
+var duty1 = {
+    "SweepTime": {
+        "options": {0: "sweep off - no freq change", 1: "7.8 ms (1/128Hz)", 2: "15.6 ms (2/128Hz)", 3: "23.4 ms (3/128Hz)", 4: "31.3 ms (4/128Hz)", 5: "39.1 ms (5/128Hz)", 6: "46.9 ms (6/128Hz)", 7: "54.7 ms (7/128Hz)"},
+        "reg": 0xFF10, "shift": 4,
+    },
+    "SweepDirection": {
+        "options": {0: "Addition (frequency increases)", 1: "Subtraction (frequency decreases)"},
+        "reg": 0xFF10, "shift": 3,
+    },
+    "SweepShift": {
+        "options": {0: "0 (fast)", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7 (slow)"},
+        "reg": 0xFF10, "shift": 0,
+    },
+    "Duty": {
+        "options": {0: "12.5% (_-------_-------_-------)", 1: "25% (__------__------__------)", 2: "50% (____----____----____----)", 3: "75% (______--______--______--)"},
+        "reg": 0xFF11, "shift": 6, "default": 2,
+    },
+    "Length": {
+        "range": [0, 63],
+        "reg": 0xFF11, "shift": 0,
+    },
+    "LengthEnable": {
+        "options": {1: "Enabled", 0: "Disabled"},
+        "reg": 0xFF14, "shift": 6,
+    },
+    "Initial volume": {
+        "range": [0, 15],
+        "reg": 0xFF12, "shift": 4,
+    },
+    "Volume Envelope direction": {
+        "options": {0: "Decrease", 1: "Increase"},
+        "reg": 0xFF12, "shift": 3,
+    },
+    "Volume Envelope sweep": {
+        "options": {0: "0 (off)", 1: "1 (fast)", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7 (slow)"},
+        "reg": 0xFF12, "shift": 0,
+    },
+    "Frequency": {
+        "range": [0, 2047],
+        "regs": {0xFF13: {"shift": 0}, 0xFF14: {"shift": -8}},
+    },
+}
+var duty2 = {
+    "Duty": {
+        "options": {0: "12.5% (_-------_-------_-------)", 1: "25% (__------__------__------)", 2: "50% (____----____----____----)", 3: "75% (______--______--______--)"},
+        "reg": 0xFF16, "shift": 6, "default": 2,
+    },
+    "Length": {
+        "range": [0, 63],
+        "reg": 0xFF16, "shift": 0,
+    },
+    "LengthEnable": {
+        "options": {1: "Enabled", 0: "Disabled"},
+        "reg": 0xFF19, "shift": 6,
+    },
+    "Initial volume": {
+        "range": [0, 15],
+        "reg": 0xFF17, "shift": 4,
+    },
+    "Volume Envelope direction": {
+        "options": {0: "Decrease", 1: "Increase"},
+        "reg": 0xFF17, "shift": 3,
+    },
+    "Volume Envelope sweep": {
+        "options": {0: "0 (off)", 1: "1 (fast)", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7 (slow)"},
+        "reg": 0xFF17, "shift": 0,
+    },
+    "Frequency": {
+        "range": [0, 2047],
+        "regs": {0xFF18: {"shift": 0}, 0xFF19: {"shift": -8}},
+    },
+}
+var wave = {
+    "Length": {
+        "range": [0, 255],
+        "reg": 0xFF1B, "shift": 0,
+    },
+    "LengthEnable": {
+        "options": {1: "Enabled", 0: "Disabled"},
+        "reg": 0xFF1E, "shift": 6,
+    },
+    "Volume": {
+        "options": {0: "Mute (No sound)", 1: "100% volume", 2: "50% volume", 3: "25% volume"},
+        "reg": 0xFF1C, "shift": 5,
+    },
+    "Frequency": {
+        "range": [0, 2047],
+        "regs": {0xFF1D: {"shift": 0}, 0xFF1E: {"shift": -8}},
+    },
+    "Wave0": { "range": [0, 15], "reg": 0xFF30, "shift": 4},
+    "Wave1": { "range": [0, 15], "reg": 0xFF30, "shift": 0},
+    "Wave2": { "range": [0, 15], "reg": 0xFF31, "shift": 4},
+    "Wave3": { "range": [0, 15], "reg": 0xFF31, "shift": 0},
+    "Wave4": { "range": [0, 15], "reg": 0xFF32, "shift": 4},
+    "Wave5": { "range": [0, 15], "reg": 0xFF32, "shift": 0},
+    "Wave6": { "range": [0, 15], "reg": 0xFF33, "shift": 4},
+    "Wave7": { "range": [0, 15], "reg": 0xFF33, "shift": 0},
+    "Wave8": { "range": [0, 15], "reg": 0xFF34, "shift": 4},
+    "Wave9": { "range": [0, 15], "reg": 0xFF34, "shift": 0},
+    "Wave10": { "range": [0, 15], "reg": 0xFF35, "shift": 4},
+    "Wave11": { "range": [0, 15], "reg": 0xFF35, "shift": 0},
+    "Wave12": { "range": [0, 15], "reg": 0xFF36, "shift": 4},
+    "Wave13": { "range": [0, 15], "reg": 0xFF36, "shift": 0},
+    "Wave14": { "range": [0, 15], "reg": 0xFF37, "shift": 4},
+    "Wave15": { "range": [0, 15], "reg": 0xFF37, "shift": 0},
+    "Wave16": { "range": [0, 15], "reg": 0xFF38, "shift": 4},
+    "Wave17": { "range": [0, 15], "reg": 0xFF38, "shift": 0},
+    "Wave18": { "range": [0, 15], "reg": 0xFF39, "shift": 4},
+    "Wave19": { "range": [0, 15], "reg": 0xFF39, "shift": 0},
+    "Wave20": { "range": [0, 15], "reg": 0xFF3A, "shift": 4},
+    "Wave21": { "range": [0, 15], "reg": 0xFF3A, "shift": 0},
+    "Wave22": { "range": [0, 15], "reg": 0xFF3B, "shift": 4},
+    "Wave23": { "range": [0, 15], "reg": 0xFF3B, "shift": 0},
+    "Wave24": { "range": [0, 15], "reg": 0xFF3C, "shift": 4},
+    "Wave25": { "range": [0, 15], "reg": 0xFF3C, "shift": 0},
+    "Wave26": { "range": [0, 15], "reg": 0xFF3D, "shift": 4},
+    "Wave27": { "range": [0, 15], "reg": 0xFF3D, "shift": 0},
+    "Wave28": { "range": [0, 15], "reg": 0xFF3E, "shift": 4},
+    "Wave29": { "range": [0, 15], "reg": 0xFF3E, "shift": 0},
+    "Wave30": { "range": [0, 15], "reg": 0xFF3F, "shift": 4},
+    "Wave31": { "range": [0, 15], "reg": 0xFF3F, "shift": 0},
+}
+var noise = {
+    "Length": {
+        "range": [0, 63],
+        "reg": 0xFF20, "shift": 0,
+    },
+    "LengthEnable": {
+        "options": {1: "Enabled", 0: "Disabled"},
+        "reg": 0xFF23, "shift": 6,
+    },
+    "Initial volume": {
+        "range": [0, 15],
+        "reg": 0xFF21, "shift": 4,
+    },
+    "Volume Envelope direction": {
+        "options": {0: "Decrease", 1: "Increase"},
+        "reg": 0xFF21, "shift": 3,
+    },
+    "Volume Envelope sweep": {
+        "options": {0: "0 (off)", 1: "1 (fast)", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7 (slow)"},
+        "reg": 0xFF21, "shift": 0,
+    },
+    "Shift Clock Frequency": {
+        "range": [0, 15],
+        "reg": 0xFF22, "shift": 4,
+    },
+    "Frequency Dividing Ratio": {
+        "range": [0, 7],
+        "reg": 0xFF22, "shift": 0,
+    },
+    "Width": {
+        "options": {0: "16bit", 1: "7bit"},
+        "reg": 0xFF22, "shift": 3,
+    },
+}
+var instruments = {"Duty 1": duty1, "Duty 2": duty2, "Wave": wave, "Noise": noise}
+
+function newDOM(parent, type) {
+    const element = document.createElement(type);
+    parent.append(element);
+    return element
+}
+
+function buildUI() {
+    for(const [instrumentname, options] of Object.entries(instruments)) {
+        const form = newDOM(document.body, "form");
+        const fieldset = newDOM(form, "fieldset");
+        newDOM(fieldset, "legend").innerText = instrumentname;
+        for(const [optionname, data] of Object.entries(options)) {
+            const optiontag = instrumentname + "_" + optionname;
+            const row = newDOM(fieldset, "div")
+            row.className = "row";
+            row.style.alignItems = "center";
+            const labelcell = newDOM(row, "div")
+            labelcell.className = "col-sm-12 col-md-4";
+            labelcell.style.textAlign = "right";
+            
+            const label = newDOM(labelcell, "label");
+            label.innerText = optionname;
+            label.htmlFor = optiontag;
+
+            const inputcell = newDOM(row, "div")
+            inputcell.className = "col-sm-12 col-md-8";
+            
+            var input;
+            if (data.options) {
+                input = newDOM(inputcell, "select");
+                for(const [k, v] of Object.entries(data.options)) {
+                    const option = newDOM(input, "option")
+                    option.innerText = v;
+                    option.value = k;
+                }
+            } else if (data.range) {
+                input = newDOM(inputcell, "input");
+                input.type = "range";
+                input.min = data.range[0];
+                input.max = data.range[1];
+                input.value = data.range[0];
+            }
+            input.id = optiontag;
+            input.onchange = (e) => {
+                playSFX(instrumentname);
+            }
+            input.oninput = input.onchange;
+        }
+        
+        const row = newDOM(fieldset, "div")
+        row.className = "row";
+        row.style.alignItems = "center";
+        const labelcell = newDOM(row, "div")
+        labelcell.className = "col-sm-12 col-md-4";
+        labelcell.style.textAlign = "right";
+        
+        const label = newDOM(labelcell, "label");
+        label.innerText = "Output";
+        const outputcell = newDOM(row, "div")
+        outputcell.className = "col-sm-12 col-md-8";
+        
+        const result = newDOM(outputcell, "textarea");
+        result.id = instrumentname + "_result";
+    }
+}
+
+function playSFX(instrumentname)
+{
+    const rom = new Uint8Array(0x8000)
+    rom.fill(0x76); //fill with halt instructions
+    for(var [idx, value] of Object.entries([0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E])) {
+        rom[0x104 + idx] = value;
+    }
+    rom[0x148] = 0;//ROM size
+    rom[0x149] = 0;//RAM size
+    emulator.init(null, rom);
+    var regs = {};
+    for(const [optionname, data] of Object.entries(instruments[instrumentname])) {
+        const optiontag = instrumentname + "_" + optionname;
+        const value = document.getElementById(optiontag).value
+        if (data.reg) {
+            if (!(data.reg in regs)) regs[data.reg] = 0;
+            regs[data.reg] |= value << data.shift;
+        } else if (data.regs) {
+            for(const [reg, regdata] of Object.entries(data.regs)) {
+                if (!(reg in regs)) regs[reg] = 0;
+                if (regdata.shift < 0)
+                    regs[reg] |= (value >> -regdata.shift) & 0xFF;
+                else
+                    regs[reg] |= (value << regdata.shift) & 0xFF;
+            }
+        }
+    }
+    if (0xFF14 in regs)
+        regs[0xFF14] |= 0x80;
+    if (0xFF19 in regs)
+        regs[0xFF19] |= 0x80;
+    if (0xFF1E in regs) {
+        regs[0xFF1A] |= 0x80;
+        regs[0xFF1E] |= 0x80;
+    }
+    if (0xFF23 in regs)
+        regs[0xFF23] |= 0x80;
+
+    emulator.writeMem(0xFF24, 0x77);
+    emulator.writeMem(0xFF25, 0xFF);
+    var code = "";
+    for(const [r, v] of Object.entries(regs).sort()) {
+        emulator.writeMem(r, v);
+        code += "ld  a, $" + ("0" + v.toString(16)).slice(-2) + "\n";
+        if (parseInt(r) in REG_NAME) {
+            code += "ldh [" + REG_NAME[parseInt(r)] + "], a\n";
+        } else {
+            code += "ldh [$" + ("000" + parseInt(r).toString(16)).slice(-4) + "], a\n";
+        }
+    }
+    document.getElementById(instrumentname + "_result").value = code;
+    runCounter = 0;
+    if (!requestedAnimationFrame)
+    {
+        requestAnimationFrame(emulatorRunFunction);
+        requestedAnimationFrame = true;
+    }
+}
+
+var runCounter = 0;
+var requestedAnimationFrame = false;
+function emulatorRunFunction() {
+    requestedAnimationFrame = false;
+    if (!document.hidden)
+    {
+        if (!emulator.isAvailable())
+            return;
+        if (runCounter > 300)
+            return;
+
+        emulator.step("run");
+        runCounter += 1;
+    }
+    requestAnimationFrame(emulatorRunFunction);
+    requestedAnimationFrame = true;
+}
+
+window.addEventListener('DOMContentLoaded', (event) => {
+    buildUI();
+});
+
+</script>
+</head>
+<body>
+
+</body>
+</html>
