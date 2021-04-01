@@ -223,10 +223,9 @@ function buildUI() {
                 input.value = data.range[0];
             }
             input.id = optiontag;
-            input.onchange = (e) => {
+            input.oninput = (e) => {
                 playSFX(instrumentname);
             }
-            input.oninput = input.onchange;
         }
         
         const row = newDOM(fieldset, "div")
