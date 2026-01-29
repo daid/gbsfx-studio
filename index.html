@@ -1,95 +1,189 @@
-<html>
-<head>
+<!doctype html>
+<title>Game Boy Sound Effect Studio</title>
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="google" content="notranslate">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/mini.css/3.0.1/mini-default.min.css">
 
 <script src="wasm/binjgb.js"></script>
 <script src="js/emulator.js"></script>
+<script src="js/janniwave.js"></script>
 <style>
 select, input {
     width: 100%
 }
-</style>
 
+input {
+    text-align: right;
+}
+
+.white-key, .black-key {
+    stroke: black;
+    vector-effect: non-scaling-stroke;
+    cursor: pointer;
+}
+
+table *, table
+{
+  flex: unset !important;
+  flex-flow: unset !important;
+}
+
+table > *
+{
+    display: unset !important;
+}
+
+table
+{
+    display: table;
+}
+
+table tr
+{
+    display: table-row;
+}
+
+td
+{
+    text-align: right;
+    cursor: pointer;
+    display: table-cell;
+}
+
+th
+{
+    display: table-cell;
+}
+
+.white-key {
+    width: 10px;
+    height: 50px;
+    fill: white;
+    rx: 2px;
+    ry: 2px;
+}
+
+.black-key {
+    width: 6px;
+    height: 30px;
+    fill: black;
+    rx: 1.5px;
+    ry: 1.5px;
+}
+
+/* make wave RAM sliders smaller */
+input[id^="Wave_Wave RAM Sample"][id$="output"]
+{
+  padding-top: 0;
+  padding-bottom: 0;
+}
+</style>
 <script>
 "use strict";
 
-var REG_NAME = {
+var REG_NAME_OLD = {
     0xFF10: "rNR10", 0xFF11: "rNR11", 0xFF12: "rNR12", 0xFF13: "rNR13", 0xFF14: "rNR14",
-    0xFF16: "rNR21", 0xFF17: "rNR22", 0xFF18: "rNR23", 0xFF19: "rNR24",
+                     0xFF16: "rNR21", 0xFF17: "rNR22", 0xFF18: "rNR23", 0xFF19: "rNR24",
     0xFF1A: "rNR30", 0xFF1B: "rNR31", 0xFF1C: "rNR32", 0xFF1D: "rNR33", 0xFF1E: "rNR34",
-    0xFF20: "rNR41", 0xFF21: "rNR42", 0xFF22: "rNR43", 0xFF23: "rNR44",
+                     0xFF20: "rNR41", 0xFF21: "rNR42", 0xFF22: "rNR43", 0xFF23: "rNR44",
+    0xFF24: "rNR50", 0xFF25: "rNR51", 0xFF26: "rNR52",
 }
 
+var REG_NAME_NEW = {
+    0xFF10: "rAUD1SWEEP", 0xFF11: "rAUD1LEN", 0xFF12: "rAUD1ENV",   0xFF13: "rAUD1LOW",  0xFF14: "rAUD1HIGH",
+                          0xFF16: "rAUD2LEN", 0xFF17: "rAUD2ENV",   0xFF18: "rAUD2LOW",  0xFF19: "rAUD2HIGH",
+    0xFF1A: "rAUD3ENA",   0xFF1B: "rAUD3LEN", 0xFF1C: "rAUD3LEVEL", 0xFF1D: "rAUD3LOW",  0xFF1E: "rAUD3HIGH",
+                          0xFF20: "rAUD4LEN", 0xFF21: "rAUD3ENV",   0xFF22: "rAUD4POLY", 0xFF23: "rAUD4GO",
+    0xFF24: "rAUDVOL",    0xFF25: "rAUDTERM", 0xFF26: "rAUDENA",
+    0xFF30: "rAUD3WAVE_0",
+    0xFF31: "rAUD3WAVE_1",
+    0xFF32: "rAUD3WAVE_2",
+    0xFF33: "rAUD3WAVE_3",
+    0xFF34: "rAUD3WAVE_4",
+    0xFF35: "rAUD3WAVE_5",
+    0xFF36: "rAUD3WAVE_6",
+    0xFF37: "rAUD3WAVE_7",
+    0xFF38: "rAUD3WAVE_8",
+    0xFF39: "rAUD3WAVE_9",
+    0xFF3A: "rAUD3WAVE_A",
+    0xFF3B: "rAUD3WAVE_B",
+    0xFF3C: "rAUD3WAVE_C",
+    0xFF3D: "rAUD3WAVE_D",
+    0xFF3E: "rAUD3WAVE_E",
+    0xFF3F: "rAUD3WAVE_F",
+}
+
+var REG_NAME = REG_NAME_NEW;
+
 var duty1 = {
-    "SweepTime": {
-        "options": {0: "sweep off - no freq change", 1: "7.8 ms (1/128Hz)", 2: "15.6 ms (2/128Hz)", 3: "23.4 ms (3/128Hz)", 4: "31.3 ms (4/128Hz)", 5: "39.1 ms (5/128Hz)", 6: "46.9 ms (6/128Hz)", 7: "54.7 ms (7/128Hz)"},
+    "Sweep Time": {
+        "options": {0: "0 — sweep off – no period/frequency change", 1: "1 — change period/frequency every ~7.8 ms (1/128 Hz) (fastest)", 2: "2 — change period/frequency every ~15.6 ms (2/128 Hz)", 3: "3 — change period/frequency every ~23.4 ms (3/128 Hz)", 4: "4 — change period/frequency every ~31.3 ms (4/128 Hz)", 5: "5 — change period/frequency every ~39.1 ms (5/128 Hz)", 6: "6 — change period/frequency every ~46.9 ms (6/128 Hz)", 7: "7 — change period/frequency every ~54.7 ms (7/128 Hz) (slowest)"},
         "reg": 0xFF10, "shift": 4,
     },
-    "SweepDirection": {
-        "options": {0: "Addition (frequency increases)", 1: "Subtraction (frequency decreases)"},
+    "Sweep Direction": {
+        "options": {0: "0 — addition (frequency increases)", 1: "1 — subtraction (frequency decreases)"},
         "reg": 0xFF10, "shift": 3,
     },
-    "SweepShift": {
-        "options": {0: "0 (fast)", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7 (slow)"},
+    "Sweep Shift": {
+        "options": {0: "0 — sweep off – no freq change", 1: "1 — change by 50% per step (fastest)", 2: "2 — change by 25% per step", 3: "3 — change by 12.5% per step", 4: "4 — change by ~6.3% per step", 5: "5 — change by ~3.1% per step", 6: "6 — change by ~1.6% per step", 7: "7 — change by ~0.8% per step (slowest)"},
         "reg": 0xFF10, "shift": 0,
     },
     "Duty": {
-        "options": {0: "12.5% (_-------_-------_-------)", 1: "25% (__------__------__------)", 2: "50% (____----____----____----)", 3: "75% (______--______--______--)"},
+        "options": {0: "0 — [‾‾‾‾‾‾‾_‾‾‾‾‾‾‾_‾‾‾‾‾‾‾_] – 12.5%", 1: "1 — [_‾‾‾‾‾‾__‾‾‾‾‾‾__‾‾‾‾‾‾_] – 25%", 2: "2 — [_‾‾‾‾____‾‾‾‾____‾‾‾‾___] – 50%", 3: "3 — [‾______‾‾______‾‾______‾] – 75%"},
         "reg": 0xFF11, "shift": 6, "default": 2,
     },
     "Length": {
         "range": [0, 63],
         "reg": 0xFF11, "shift": 0,
     },
-    "LengthEnable": {
-        "options": {1: "Enabled", 0: "Disabled"},
+    "Length Enable": {
+        "options": {1: "1 — enabled", 0: "0 — disabled"},
         "reg": 0xFF14, "shift": 6,
     },
-    "Initial volume": {
+    "Initial Volume": {
         "range": [0, 15],
-        "reg": 0xFF12, "shift": 4,
+        "reg": 0xFF12, "shift": 4, "default": 1,
     },
-    "Volume Envelope direction": {
-        "options": {0: "Decrease", 1: "Increase"},
+    "Volume Envelope Direction": {
+        "options": {0: "0 — decrease by 1 each step", 1: "1 — increase by 1 each step"},
         "reg": 0xFF12, "shift": 3,
     },
-    "Volume Envelope sweep": {
-        "options": {0: "0 (off)", 1: "1 (fast)", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7 (slow)"},
+    "Volume Envelope Pace": {
+        "options": {0: "0 — off – no volume change", 1: "1 — change every ~15.6 ms (1/64 Hz) (fastest)", 2: "2 — change every ~31.3 ms (2/64 Hz)", 3: "3 — change every ~46.9 ms (3/64 Hz)", 4: "4 — change every 62.5 ms (4/64 Hz)", 5: "5 — change every ~78.1 ms (5/64 Hz)", 6: "6 — change every ~93.8 ms (6/64 Hz)", 7: "7 — change every ~109.3 ms (7/64 Hz) (slowest)"},
         "reg": 0xFF12, "shift": 0,
     },
-    "Frequency": {
+    "Period": {
         "range": [0, 2047],
         "regs": {0xFF13: {"shift": 0}, 0xFF14: {"shift": -8}},
     },
 }
 var duty2 = {
     "Duty": {
-        "options": {0: "12.5% (_-------_-------_-------)", 1: "25% (__------__------__------)", 2: "50% (____----____----____----)", 3: "75% (______--______--______--)"},
+        "options": {0: "0 — [‾‾‾‾‾‾‾_‾‾‾‾‾‾‾_‾‾‾‾‾‾‾_] – 12.5%", 1: "1 — [_‾‾‾‾‾‾__‾‾‾‾‾‾__‾‾‾‾‾‾_] – 25%", 2: "2 — [_‾‾‾‾____‾‾‾‾____‾‾‾‾___] – 50%", 3: "3 — [‾______‾‾______‾‾______‾] – 75%"},
         "reg": 0xFF16, "shift": 6, "default": 2,
     },
     "Length": {
         "range": [0, 63],
         "reg": 0xFF16, "shift": 0,
     },
-    "LengthEnable": {
-        "options": {1: "Enabled", 0: "Disabled"},
+    "Length Enable": {
+        "options": {1: "1 — enabled", 0: "0 — disabled"},
         "reg": 0xFF19, "shift": 6,
     },
-    "Initial volume": {
+    "Initial Volume": {
         "range": [0, 15],
-        "reg": 0xFF17, "shift": 4,
+        "reg": 0xFF17, "shift": 4, "default": 1,
     },
-    "Volume Envelope direction": {
-        "options": {0: "Decrease", 1: "Increase"},
+    "Volume Envelope Direction": {
+        "options": {0: "0 — decrease by 1 each step", 1: "1 — increase by 1 each step"},
         "reg": 0xFF17, "shift": 3,
     },
-    "Volume Envelope sweep": {
-        "options": {0: "0 (off)", 1: "1 (fast)", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7 (slow)"},
+    "Volume Envelope Pace": {
+        "options": {0: "0 — off – no volume change", 1: "1 — change every ~15.6 ms (1/64 Hz) (fastest)", 2: "2 — change every ~31.3 ms (2/64 Hz)", 3: "3 — change every ~46.9 ms (3/64 Hz)", 4: "4 — change every 62.5 ms (4/64 Hz)", 5: "5 — change every ~78.1 ms (5/64 Hz)", 6: "6 — change every ~93.8 ms (6/64 Hz)", 7: "7 — change every ~109.3 ms (7/64 Hz) (slowest)"},
         "reg": 0xFF17, "shift": 0,
     },
-    "Frequency": {
+    "Period": {
         "range": [0, 2047],
         "regs": {0xFF18: {"shift": 0}, 0xFF19: {"shift": -8}},
     },
@@ -99,83 +193,83 @@ var wave = {
         "range": [0, 255],
         "reg": 0xFF1B, "shift": 0,
     },
-    "LengthEnable": {
-        "options": {1: "Enabled", 0: "Disabled"},
+    "Length Enable": {
+        "options": {1: "1 — enabled", 0: "0 — disabled"},
         "reg": 0xFF1E, "shift": 6,
     },
     "Volume": {
-        "options": {0: "Mute (No sound)", 1: "100% volume", 2: "50% volume", 3: "25% volume"},
-        "reg": 0xFF1C, "shift": 5,
+        "options": {0: "0 — mute (no sound)", 1: "1 — 100% volume (play the original samples)", 2: "2 — 50% volume (play samples shifted right by 1)", 3: "3 — 25% volume (play samples shifted right by 2)"},
+        "reg": 0xFF1C, "shift": 5, "default": 3,
     },
-    "Frequency": {
+    "Wave RAM Sample 31": { "range": [0, 15], "reg": 0xFF30, "shift": 4},
+    "Wave RAM Sample 0": { "range": [0, 15], "reg": 0xFF30, "shift": 0},
+    "Wave RAM Sample 1": { "range": [0, 15], "reg": 0xFF31, "shift": 4},
+    "Wave RAM Sample 2": { "range": [0, 15], "reg": 0xFF31, "shift": 0},
+    "Wave RAM Sample 3": { "range": [0, 15], "reg": 0xFF32, "shift": 4},
+    "Wave RAM Sample 4": { "range": [0, 15], "reg": 0xFF32, "shift": 0},
+    "Wave RAM Sample 5": { "range": [0, 15], "reg": 0xFF33, "shift": 4},
+    "Wave RAM Sample 6": { "range": [0, 15], "reg": 0xFF33, "shift": 0},
+    "Wave RAM Sample 7": { "range": [0, 15], "reg": 0xFF34, "shift": 4},
+    "Wave RAM Sample 8": { "range": [0, 15], "reg": 0xFF34, "shift": 0},
+    "Wave RAM Sample 9": { "range": [0, 15], "reg": 0xFF35, "shift": 4},
+    "Wave RAM Sample 10": { "range": [0, 15], "reg": 0xFF35, "shift": 0},
+    "Wave RAM Sample 11": { "range": [0, 15], "reg": 0xFF36, "shift": 4},
+    "Wave RAM Sample 12": { "range": [0, 15], "reg": 0xFF36, "shift": 0},
+    "Wave RAM Sample 13": { "range": [0, 15], "reg": 0xFF37, "shift": 4},
+    "Wave RAM Sample 14": { "range": [0, 15], "reg": 0xFF37, "shift": 0},
+    "Wave RAM Sample 15": { "range": [0, 15], "reg": 0xFF38, "shift": 4},
+    "Wave RAM Sample 16": { "range": [0, 15], "reg": 0xFF38, "shift": 0},
+    "Wave RAM Sample 17": { "range": [0, 15], "reg": 0xFF39, "shift": 4},
+    "Wave RAM Sample 18": { "range": [0, 15], "reg": 0xFF39, "shift": 0},
+    "Wave RAM Sample 19": { "range": [0, 15], "reg": 0xFF3A, "shift": 4},
+    "Wave RAM Sample 20": { "range": [0, 15], "reg": 0xFF3A, "shift": 0},
+    "Wave RAM Sample 21": { "range": [0, 15], "reg": 0xFF3B, "shift": 4},
+    "Wave RAM Sample 22": { "range": [0, 15], "reg": 0xFF3B, "shift": 0},
+    "Wave RAM Sample 23": { "range": [0, 15], "reg": 0xFF3C, "shift": 4},
+    "Wave RAM Sample 24": { "range": [0, 15], "reg": 0xFF3C, "shift": 0},
+    "Wave RAM Sample 25": { "range": [0, 15], "reg": 0xFF3D, "shift": 4},
+    "Wave RAM Sample 26": { "range": [0, 15], "reg": 0xFF3D, "shift": 0},
+    "Wave RAM Sample 27": { "range": [0, 15], "reg": 0xFF3E, "shift": 4},
+    "Wave RAM Sample 28": { "range": [0, 15], "reg": 0xFF3E, "shift": 0},
+    "Wave RAM Sample 29": { "range": [0, 15], "reg": 0xFF3F, "shift": 4},
+    "Wave RAM Sample 30": { "range": [0, 15], "reg": 0xFF3F, "shift": 0},
+    "Period": {
         "range": [0, 2047],
         "regs": {0xFF1D: {"shift": 0}, 0xFF1E: {"shift": -8}},
     },
-    "Wave0": { "range": [0, 15], "reg": 0xFF30, "shift": 4},
-    "Wave1": { "range": [0, 15], "reg": 0xFF30, "shift": 0},
-    "Wave2": { "range": [0, 15], "reg": 0xFF31, "shift": 4},
-    "Wave3": { "range": [0, 15], "reg": 0xFF31, "shift": 0},
-    "Wave4": { "range": [0, 15], "reg": 0xFF32, "shift": 4},
-    "Wave5": { "range": [0, 15], "reg": 0xFF32, "shift": 0},
-    "Wave6": { "range": [0, 15], "reg": 0xFF33, "shift": 4},
-    "Wave7": { "range": [0, 15], "reg": 0xFF33, "shift": 0},
-    "Wave8": { "range": [0, 15], "reg": 0xFF34, "shift": 4},
-    "Wave9": { "range": [0, 15], "reg": 0xFF34, "shift": 0},
-    "Wave10": { "range": [0, 15], "reg": 0xFF35, "shift": 4},
-    "Wave11": { "range": [0, 15], "reg": 0xFF35, "shift": 0},
-    "Wave12": { "range": [0, 15], "reg": 0xFF36, "shift": 4},
-    "Wave13": { "range": [0, 15], "reg": 0xFF36, "shift": 0},
-    "Wave14": { "range": [0, 15], "reg": 0xFF37, "shift": 4},
-    "Wave15": { "range": [0, 15], "reg": 0xFF37, "shift": 0},
-    "Wave16": { "range": [0, 15], "reg": 0xFF38, "shift": 4},
-    "Wave17": { "range": [0, 15], "reg": 0xFF38, "shift": 0},
-    "Wave18": { "range": [0, 15], "reg": 0xFF39, "shift": 4},
-    "Wave19": { "range": [0, 15], "reg": 0xFF39, "shift": 0},
-    "Wave20": { "range": [0, 15], "reg": 0xFF3A, "shift": 4},
-    "Wave21": { "range": [0, 15], "reg": 0xFF3A, "shift": 0},
-    "Wave22": { "range": [0, 15], "reg": 0xFF3B, "shift": 4},
-    "Wave23": { "range": [0, 15], "reg": 0xFF3B, "shift": 0},
-    "Wave24": { "range": [0, 15], "reg": 0xFF3C, "shift": 4},
-    "Wave25": { "range": [0, 15], "reg": 0xFF3C, "shift": 0},
-    "Wave26": { "range": [0, 15], "reg": 0xFF3D, "shift": 4},
-    "Wave27": { "range": [0, 15], "reg": 0xFF3D, "shift": 0},
-    "Wave28": { "range": [0, 15], "reg": 0xFF3E, "shift": 4},
-    "Wave29": { "range": [0, 15], "reg": 0xFF3E, "shift": 0},
-    "Wave30": { "range": [0, 15], "reg": 0xFF3F, "shift": 4},
-    "Wave31": { "range": [0, 15], "reg": 0xFF3F, "shift": 0},
 }
 var noise = {
     "Length": {
         "range": [0, 63],
         "reg": 0xFF20, "shift": 0,
     },
-    "LengthEnable": {
-        "options": {1: "Enabled", 0: "Disabled"},
+    "Length Enable": {
+        "options": {1: "1 — enabled", 0: "0 — disabled"},
         "reg": 0xFF23, "shift": 6,
     },
-    "Initial volume": {
+    "Initial Volume": {
         "range": [0, 15],
-        "reg": 0xFF21, "shift": 4,
+        "reg": 0xFF21, "shift": 4, "default": 1,
     },
-    "Volume Envelope direction": {
-        "options": {0: "Decrease", 1: "Increase"},
+    "Volume Envelope Direction": {
+        "options": {0: "0 — decrease by 1 each step", 1: "1 — increase by 1 each step"},
         "reg": 0xFF21, "shift": 3,
     },
-    "Volume Envelope sweep": {
-        "options": {0: "0 (off)", 1: "1 (fast)", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6", 7: "7 (slow)"},
+    "Volume Envelope Pace": {
+        "options": {0: "0 — off – no volume change", 1: "1 — change every ~15.6 ms (1/64 Hz) (fastest)", 2: "2 — change every ~31.3 ms (2/64 Hz)", 3: "3 — change every ~46.9 ms (3/64 Hz)", 4: "4 — change every 62.5 ms (4/64 Hz)", 5: "5 — change every ~78.1 ms (5/64 Hz)", 6: "6 — change every ~93.8 ms (6/64 Hz)", 7: "7 — change every ~109.3 ms (7/64 Hz) (slowest)"},
         "reg": 0xFF21, "shift": 0,
     },
-    "Shift Clock Frequency": {
-        "range": [0, 15],
+    "LFSR Width": {
+        "options": {0: "0 — 15-bit (more noise-like)", 1: "1 — 7-bit (more pulse-like)"},
+        "reg": 0xFF22, "shift": 3,
+    },
+    "Frequency Shift": {
+        "range": [0, 13],
         "reg": 0xFF22, "shift": 4,
     },
     "Frequency Dividing Ratio": {
         "range": [0, 7],
         "reg": 0xFF22, "shift": 0,
-    },
-    "Width": {
-        "options": {0: "16bit", 1: "7bit"},
-        "reg": 0xFF22, "shift": 3,
     },
 }
 var instruments = {"Duty 1": duty1, "Duty 2": duty2, "Wave": wave, "Noise": noise}
@@ -187,8 +281,9 @@ function newDOM(parent, type) {
 }
 
 function buildUI() {
+    var channelIndex = 0;
     for(const [instrumentname, options] of Object.entries(instruments)) {
-        const form = newDOM(document.body, "form");
+        const form = newDOM(formcontainer, "form");
         const fieldset = newDOM(form, "fieldset");
         newDOM(fieldset, "legend").innerText = instrumentname;
         for(const [optionname, data] of Object.entries(options)) {
@@ -205,56 +300,153 @@ function buildUI() {
             label.htmlFor = optiontag;
 
             const inputcell = newDOM(row, "div")
+            if ( data.range ) {
+              if ( (optionname == "Period") || (optionname == "Length") )
+              inputcell.className = "col-sm-12 col-md-6";
+              else
+              inputcell.className = "col-sm-12 col-md-7";
+            } else
             inputcell.className = "col-sm-12 col-md-8";
             
-            var input;
             if (data.options) {
-                input = newDOM(inputcell, "select");
+                const input = newDOM(inputcell, "select");
                 for(const [k, v] of Object.entries(data.options)) {
                     const option = newDOM(input, "option")
                     option.innerText = v;
                     option.value = k;
                 }
+                input.value = data.default ?? 0;
+                input.id = optiontag;
+                input.oninput = (e) => {
+                    playSFX(instrumentname);
+                }
             } else if (data.range) {
-                input = newDOM(inputcell, "input");
+                const input = newDOM(inputcell, "input");
                 input.type = "range";
                 input.min = data.range[0];
                 input.max = data.range[1];
-                input.value = data.range[0];
-            }
-            input.id = optiontag;
-            input.oninput = (e) => {
-                playSFX(instrumentname);
+                input.value = data.default ?? data.range[0];
+                input.id = optiontag;
+                
+                // output 1
+                const outputcell = newDOM(row, "div")
+                outputcell.className = "col-sm-12 col-md-1";
+                
+                const output = newDOM(outputcell, "input");
+                output.type = "number";
+                output.min = data.range[0];
+                output.max = data.range[1];
+                output.value = input.value;
+                output.id = optiontag + "_output";
+                
+                const inputname = input.id;
+                const outputname = output.id;
+                
+                if ( (optionname == "Period") || (optionname == "Length") )
+                {
+                    const output2cell = newDOM(row, "div")
+                    output2cell.className = "col-sm-12 col-md-1";
+                    
+                    const output2 = newDOM(output2cell, "input");
+                    output2.disabled = true;
+                    output2.id = optiontag + "_output2";
+                }
+                
+                input.oninput = (e) => {
+                    document.getElementById(outputname).value = document.getElementById(inputname).value;
+                    if ( optionname == "Period" )
+                    document.getElementById(outputname+"2").value = Number(131072/(2048 - document.getElementById(inputname).value)).toFixed(1) + " Hz";
+                    if ( optionname == "Length" )
+                    document.getElementById(outputname+"2").value = Number((document.getElementById(inputname).max - document.getElementById(inputname).value + 1) * 4).toFixed(0) + " ms";
+                    playSFX(instrumentname);
+                }
+                
+                output.oninput = (e) => {
+                    document.getElementById(inputname).value = document.getElementById(outputname).value;
+                    document.getElementById(inputname).oninput();
+                }
+                    if ( optionname == "Period" )
+                    document.getElementById(outputname+"2").value = Number(131072/(2048 - document.getElementById(inputname).value)).toFixed(1) + " Hz";
+                    if ( optionname == "Length" )
+                    document.getElementById(outputname+"2").value = Number((document.getElementById(inputname).max - document.getElementById(inputname).value + 1) * 4).toFixed(0) + " ms";
             }
         }
         
-        const row = newDOM(fieldset, "div")
+        // keyboard/table
+        var row = newDOM(fieldset, "div")
         row.className = "row";
         row.style.alignItems = "center";
-        const labelcell = newDOM(row, "div")
+        var labelcell = newDOM(row, "div")
         labelcell.className = "col-sm-12 col-md-4";
         labelcell.style.textAlign = "right";
         
-        const label = newDOM(labelcell, "label");
-        label.innerText = "Output";
-        const outputcell = newDOM(row, "div")
+        var label = newDOM(labelcell, "label");
+        if ( instrumentname == "Noise" )
+        label.innerText = "Sample Rate [Hz]";
+        else
+        label.innerText = "Period/Frequency Picker";
+        var outputcell = newDOM(row, "div")
+        outputcell.className = "col-sm-12 col-md-8";
+        outputcell.id = instrumentname + "_picker";
+        
+        // output
+        var row = newDOM(fieldset, "div")
+        row.className = "row";
+        row.style.alignItems = "center";
+        var labelcell = newDOM(row, "div")
+        labelcell.className = "col-sm-12 col-md-4";
+        labelcell.style.textAlign = "right";
+        
+        var label = newDOM(labelcell, "label");
+        label.innerText = "Assembly Output";
+        label.htmlFor = instrumentname + "_result";
+        var outputcell = newDOM(row, "div")
         outputcell.className = "col-sm-12 col-md-8";
         
         const result = newDOM(outputcell, "textarea");
         result.id = instrumentname + "_result";
+        
+        // buttons
+        var row = newDOM(fieldset, "div")
+        row.className = "row";
+        row.style.alignItems = "center";
+        var labelcell = newDOM(row, "div")
+        labelcell.className = "col-sm-12 col-md-4";
+        labelcell.style.textAlign = "right";
+        
+        var label = newDOM(labelcell, "label");
+        var outputcell = newDOM(row, "div")
+        outputcell.className = "col-sm-12 col-md-8";
+        
+        const play = newDOM(outputcell, "button");
+        play.id = instrumentname + "_play";
+        play.type = "button";
+        play.onclick = (e) => {
+            playSFX(instrumentname);
+        }
+        play.innerHTML = "&#x25B6;&#xFE0F; Play Again";
+        const stop = newDOM(outputcell, "button");
+        stop.id = instrumentname + "_stop";
+        stop.type = "button";
+        stop.onclick = (e) => {
+            stopSFX();
+        }
+        stop.innerHTML = "&#x23F9;&#xFE0F; Stop All";
+        
+        channelIndex++;
+        const channelIndex2 = channelIndex;
+        const download = newDOM(outputcell, "button");
+        download.id = instrumentname + "_download";
+        download.type = "button";
+        download.onclick = (e) => {
+            downloadWAV(instrumentname, channelIndex2);
+        }
+        download.innerHTML = "&#x2B07;&#xFE0F; Download WAV";
     }
 }
 
-function playSFX(instrumentname)
+function getRegs(instrumentname)
 {
-    const rom = new Uint8Array(0x8000)
-    rom.fill(0x76); //fill with halt instructions
-    for(var [idx, value] of Object.entries([0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E])) {
-        rom[0x104 + idx] = value;
-    }
-    rom[0x148] = 0;//ROM size
-    rom[0x149] = 0;//RAM size
-    emulator.init(null, rom);
     var regs = {};
     for(const [optionname, data] of Object.entries(instruments[instrumentname])) {
         const optiontag = instrumentname + "_" + optionname;
@@ -272,6 +464,7 @@ function playSFX(instrumentname)
             }
         }
     }
+    
     if (0xFF14 in regs)
         regs[0xFF14] |= 0x80;
     if (0xFF19 in regs)
@@ -282,11 +475,41 @@ function playSFX(instrumentname)
     }
     if (0xFF23 in regs)
         regs[0xFF23] |= 0x80;
+        
+    return regs;
+}
 
-    emulator.writeMem(0xFF24, 0x77);
-    emulator.writeMem(0xFF25, 0xFF);
+function sortNR34Last(a, b)
+{
+    // Wave channel is the only channel whose NRx4 is not the last register
+    if ( a[0] == 0xFF1E ) return 1;
+    if ( b[0] == 0xFF1E ) return -1;
+    return a[0]-b[0];
+}
+
+function playSFX(instrumentname)
+{
+    if ( (runCounter >= runCounterMax) ) // don't need to run the ROM again when it's already running
+    {
+      const rom = new Uint8Array(0x8000)
+      rom.fill(0x76); // fill with halt instructions
+      // write Nintendo logo
+      for(var [idx, value] of Object.entries([0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D, 0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99, 0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E])) {
+          rom[0x104 + idx] = value;
+      }
+      rom[0x148] = 0; // ROM size
+      rom[0x149] = 0; // RAM size
+      emulator.init(null, rom);
+    }
+    runCounter = 0;
+    var regs = getRegs(instrumentname);
+
+    emulator.writeMem(0xFF24, 0x77); // set volume of both channels to max (but leave VIN)
+    emulator.writeMem(0xFF25, 0xFF); // turn everything on
+    if (instrumentname == "Wave") // disable wave RAM so we can write it
+    emulator.writeMem(0xFF1A, 0x00);
     var code = "";
-    for(const [r, v] of Object.entries(regs).sort()) {
+    for(const [r, v] of Object.entries(regs).sort(sortNR34Last)) {
         emulator.writeMem(r, v);
         code += "ld  a, $" + ("0" + v.toString(16)).slice(-2) + "\n";
         if (parseInt(r) in REG_NAME) {
@@ -295,8 +518,9 @@ function playSFX(instrumentname)
             code += "ldh [$" + ("000" + parseInt(r).toString(16)).slice(-4) + "], a\n";
         }
     }
+    
     document.getElementById(instrumentname + "_result").value = code;
-    runCounter = 0;
+    //runCounter = 0;
     if (!requestedAnimationFrame)
     {
         requestAnimationFrame(emulatorRunFunction);
@@ -304,7 +528,13 @@ function playSFX(instrumentname)
     }
 }
 
-var runCounter = 0;
+function stopSFX()
+{
+    runCounter = runCounterMax;
+}
+
+var runCounterMax = 5 * 60; // 5 seconds times ~60 fps
+var runCounter = runCounterMax;
 var requestedAnimationFrame = false;
 function emulatorRunFunction() {
     requestedAnimationFrame = false;
@@ -312,7 +542,7 @@ function emulatorRunFunction() {
     {
         if (!emulator.isAvailable())
             return;
-        if (runCounter > 300)
+        if (runCounter >= runCounterMax)
             return;
 
         emulator.step("run");
@@ -324,11 +554,144 @@ function emulatorRunFunction() {
 
 window.addEventListener('DOMContentLoaded', (event) => {
     buildUI();
+    
+    var keyboard = document.getElementsByClassName("keyboard")[0];
+    
+    document.getElementById("Duty 1_picker").innerHTML = keyboard.outerHTML;
+    document.getElementById("Duty 2_picker").innerHTML = keyboard.outerHTML.replaceAll("key(1,", "key(2,");
+    document.getElementById("Wave_picker").innerHTML = keyboard.outerHTML.replaceAll("key(1,", "key(3,");
+    keyboard.remove();
+    
+    document.getElementById("Noise_picker").replaceChildren(polypicker);
 });
 
-</script>
-</head>
-<body>
+function key(channel, period)
+{
+    switch ( channel )
+    {
+        case 1: document.getElementById('Duty 1_Period').value = period; document.getElementById('Duty 1_Period').oninput(); break;
+        case 2: document.getElementById('Duty 2_Period').value = period; document.getElementById('Duty 2_Period').oninput(); break;
+        case 3: document.getElementById('Wave_Period').value = period; document.getElementById('Wave_Period').oninput(); break;
+    }
+}
 
-</body>
-</html>
+function poly(div, shift)
+{
+    document.getElementById('Noise_Frequency Dividing Ratio').value = div;
+    document.getElementById('Noise_Frequency Dividing Ratio').oninput();
+    document.getElementById('Noise_Frequency Shift').value = shift;
+    document.getElementById('Noise_Frequency Shift').oninput();
+}
+
+function downloadWAV(instrumentName, channelIndex)
+{
+    var content = createWAV(channelIndex, new Number(maxlength.value), getRegs(instrumentName));
+    downloadFile(content, instrumentName+'.wav', 'audio/vnc.wave');
+}
+
+</script>
+
+<p>Notes:</p>
+<ul>
+<li>A similar software (but without wave RAM editing) to run directly on your device (or emulator) can be found in <a href="https://github.com/gbdk-2020/gbdk-2020/tree/develop/gbdk-lib/examples/gb/sound">GBDK’s example</a>. If you don't want to build it yourself, there's a <a href="https://github.com/LaroldsJubilantJunkyard/playing-sounds-in-gbdk">repository with the binary</a>.
+<li>The download feature produces a WAV file with the Game Boy's digital output at its native sample rate (1&thinsp;MiHz for duty, 2&thinsp;MiHz for wave, 512&thinsp;KiHz for noise), which is non-standard for the WAV format. You will likely need professional audio software to open the file, e.&thinsp;g. <a href="https://www.audacityteam.org/">Audacity</a>.
+<li>Hovering the keyboard keys displays the name of a note. For the wave channel, this and the displayed frequency only apply if the wave RAM samples go up and down exactly twice (each).
+<li>The keyboard uses the correct periods, whereas most Game Boy software and references use incorrect values for C♯3, D3, G3, A3, C5 and C♯8.
+<li>Assembly output does not contain the writes to <code>rNR5x</code>.
+<li>Any change implicitly triggers the channel.
+</ul>
+<form>
+<div class="row" style="align-items: center;"><div class="col-sm-12 col-md-4" style="text-align: right;">Register Constant Names for Assembly Code Output</div><div class="col-sm-12 col-md-8"><label><input type="radio" name="reg_name" onclick="REG_NAME = REG_NAME_OLD">old (Nintendo's <code>rNRxx</code> notation)</label> <label><input type="radio" name="reg_name" onclick="REG_NAME = REG_NAME_NEW" checked>new (<code>hardware.inc</code>'s preferred notation)</label></div></div>
+<div class="row" style="align-items: center;"><div class="col-sm-12 col-md-4" style="text-align: right;">Maximum Playback Length</div><div class="col-sm-12 col-md-8"><input type="number" value="5" style="width:auto;" id="maxlength" oninput="runCounterMax = maxlength.value * 60"> seconds</div></div>
+</form>
+
+<svg viewbox="-1 3 422 49" class="keyboard">
+<rect onclick="key(1,   44)" x="000" class="white-key"><title>C3</title></rect>
+<rect onclick="key(1,  263)" x="010" class="white-key"><title>D3</title></rect>
+<rect onclick="key(1,  457)" x="020" class="white-key"><title>E3</title></rect>
+<rect onclick="key(1,  547)" x="030" class="white-key"><title>F3</title></rect>
+<rect onclick="key(1,  711)" x="040" class="white-key"><title>G3</title></rect>
+<rect onclick="key(1,  856)" x="050" class="white-key"><title>A3</title></rect>
+<rect onclick="key(1,  986)" x="060" class="white-key"><title>B3</title></rect>
+<rect onclick="key(1,  157)" x="006" class="black-key"><title>C♯3/D♭3</title></rect>
+<rect onclick="key(1,  363)" x="018" class="black-key"><title>D♯3/E♭3</title></rect>
+<rect onclick="key(1,  631)" x="036" class="black-key"><title>F♯3/G♭3</title></rect>
+<rect onclick="key(1,  786)" x="047" class="black-key"><title>G♯3/A♭3</title></rect>
+<rect onclick="key(1,  923)" x="058" class="black-key"><title>A♯3/B♭3</title></rect>
+<rect onclick="key(1, 1046)" x="070" class="white-key"><title>C4</title></rect>
+<rect onclick="key(1, 1155)" x="080" class="white-key"><title>D4</title></rect>
+<rect onclick="key(1, 1253)" x="090" class="white-key"><title>E4</title></rect>
+<rect onclick="key(1, 1297)" x="100" class="white-key"><title>F4</title></rect>
+<rect onclick="key(1, 1379)" x="110" class="white-key"><title>G4</title></rect>
+<rect onclick="key(1, 1452)" x="120" class="white-key"><title>A4</title></rect>
+<rect onclick="key(1, 1517)" x="130" class="white-key"><title>B4</title></rect>
+<rect onclick="key(1, 1102)" x="076" class="black-key"><title>C♯4/D♭4</title></rect>
+<rect onclick="key(1, 1205)" x="088" class="black-key"><title>D♯4/E♭4</title></rect>
+<rect onclick="key(1, 1339)" x="106" class="black-key"><title>F♯4/G♭4</title></rect>
+<rect onclick="key(1, 1417)" x="117" class="black-key"><title>G♯4/A♭4</title></rect>
+<rect onclick="key(1, 1486)" x="128" class="black-key"><title>A♯4/B♭4</title></rect>
+<rect onclick="key(1, 1547)" x="140" class="white-key"><title>C5</title></rect>
+<rect onclick="key(1, 1602)" x="150" class="white-key"><title>D5</title></rect>
+<rect onclick="key(1, 1650)" x="160" class="white-key"><title>E5</title></rect>
+<rect onclick="key(1, 1673)" x="170" class="white-key"><title>F5</title></rect>
+<rect onclick="key(1, 1714)" x="180" class="white-key"><title>G5</title></rect>
+<rect onclick="key(1, 1750)" x="190" class="white-key"><title>A5</title></rect>
+<rect onclick="key(1, 1783)" x="200" class="white-key"><title>B5</title></rect>
+<rect onclick="key(1, 1575)" x="146" class="black-key"><title>C♯5/D♭5</title></rect>
+<rect onclick="key(1, 1627)" x="158" class="black-key"><title>D♯5/E♭5</title></rect>
+<rect onclick="key(1, 1694)" x="176" class="black-key"><title>F♯5/G♭5</title></rect>
+<rect onclick="key(1, 1732)" x="187" class="black-key"><title>G♯5/A♭5</title></rect>
+<rect onclick="key(1, 1767)" x="198" class="black-key"><title>A♯5/B♭5</title></rect>
+<rect onclick="key(1, 1798)" x="210" class="white-key"><title>C6</title></rect>
+<rect onclick="key(1, 1825)" x="220" class="white-key"><title>D6</title></rect>
+<rect onclick="key(1, 1849)" x="230" class="white-key"><title>E6</title></rect>
+<rect onclick="key(1, 1860)" x="240" class="white-key"><title>F6</title></rect>
+<rect onclick="key(1, 1881)" x="250" class="white-key"><title>G6</title></rect>
+<rect onclick="key(1, 1899)" x="260" class="white-key"><title>A6</title></rect>
+<rect onclick="key(1, 1915)" x="270" class="white-key"><title>B6</title></rect>
+<rect onclick="key(1, 1812)" x="216" class="black-key"><title>C♯6/D♭6</title></rect>
+<rect onclick="key(1, 1837)" x="228" class="black-key"><title>D♯6/E♭6</title></rect>
+<rect onclick="key(1, 1871)" x="246" class="black-key"><title>F♯6/G♭6</title></rect>
+<rect onclick="key(1, 1890)" x="257" class="black-key"><title>G♯6/A♭6</title></rect>
+<rect onclick="key(1, 1907)" x="268" class="black-key"><title>A♯6/B♭6</title></rect>
+<rect onclick="key(1, 1923)" x="280" class="white-key"><title>C7</title></rect>
+<rect onclick="key(1, 1936)" x="290" class="white-key"><title>D7</title></rect>
+<rect onclick="key(1, 1949)" x="300" class="white-key"><title>E7</title></rect>
+<rect onclick="key(1, 1954)" x="310" class="white-key"><title>F7</title></rect>
+<rect onclick="key(1, 1964)" x="320" class="white-key"><title>G7</title></rect>
+<rect onclick="key(1, 1974)" x="330" class="white-key"><title>A7</title></rect>
+<rect onclick="key(1, 1982)" x="340" class="white-key"><title>B7</title></rect>
+<rect onclick="key(1, 1930)" x="286" class="black-key"><title>C♯7/D♭7</title></rect>
+<rect onclick="key(1, 1943)" x="298" class="black-key"><title>D♯7/E♭7</title></rect>
+<rect onclick="key(1, 1959)" x="316" class="black-key"><title>F♯7/G♭7</title></rect>
+<rect onclick="key(1, 1969)" x="327" class="black-key"><title>G♯7/A♭7</title></rect>
+<rect onclick="key(1, 1978)" x="338" class="black-key"><title>A♯7/B♭7</title></rect>
+<rect onclick="key(1, 1985)" x="350" class="white-key"><title>C8</title></rect>
+<rect onclick="key(1, 1992)" x="360" class="white-key"><title>D8</title></rect>
+<rect onclick="key(1, 1998)" x="370" class="white-key"><title>E8</title></rect>
+<rect onclick="key(1, 2001)" x="380" class="white-key"><title>F8</title></rect>
+<rect onclick="key(1, 2006)" x="390" class="white-key"><title>G8</title></rect>
+<rect onclick="key(1, 2011)" x="400" class="white-key"><title>A8</title></rect>
+<rect onclick="key(1, 2015)" x="410" class="white-key"><title>B8</title></rect>
+<rect onclick="key(1, 1989)" x="356" class="black-key"><title>C♯8/D♭8</title></rect>
+<rect onclick="key(1, 1995)" x="368" class="black-key"><title>D♯8/E♭8</title></rect>
+<rect onclick="key(1, 2004)" x="386" class="black-key"><title>F♯8/G♭8</title></rect>
+<rect onclick="key(1, 2009)" x="397" class="black-key"><title>G♯8/A♭8</title></rect>
+<rect onclick="key(1, 2013)" x="408" class="black-key"><title>A♯8/B♭8</title></rect>
+</svg>
+
+<table id="polypicker" style="max-height:none !important;width:auto;">
+<tr><th>DIV\SHIFT<th>0<th>1<th>2<th>3<th>4<th>5<th>6<th>7<th>8<th>9<th>10<th>11<th>12<th>13
+<tr><th>0<td onclick="poly(0,0)">524288<td onclick="poly(0,1)">262144<td onclick="poly(0,2)">131072<td onclick="poly(0,3)">65536<td onclick="poly(0,4)">32768<td onclick="poly(0,5)">16384<td onclick="poly(0,6)">8192<td onclick="poly(0,7)">4096<td onclick="poly(0,8)">2048<td onclick="poly(0,9)">1024<td onclick="poly(0,10)">512<td onclick="poly(0,11)">256<td onclick="poly(0,12)">128<td onclick="poly(0,13)">64
+<tr><th>1<td onclick="poly(1,0)">262144<td onclick="poly(1,1)">131072<td onclick="poly(1,2)">65536<td onclick="poly(1,3)">32768<td onclick="poly(1,4)">16384<td onclick="poly(1,5)">8192<td onclick="poly(1,6)">4096<td onclick="poly(1,7)">2048<td onclick="poly(1,8)">1024<td onclick="poly(1,9)">512<td onclick="poly(1,10)">256<td onclick="poly(1,11)">128<td onclick="poly(1,12)">64<td onclick="poly(1,13)">32
+<tr><th>2<td onclick="poly(2,0)">131072<td onclick="poly(2,1)">65536<td onclick="poly(2,2)">32768<td onclick="poly(2,3)">16384<td onclick="poly(2,4)">8192<td onclick="poly(2,5)">4096<td onclick="poly(2,6)">2048<td onclick="poly(2,7)">1024<td onclick="poly(2,8)">512<td onclick="poly(2,9)">256<td onclick="poly(2,10)">128<td onclick="poly(2,11)">64<td onclick="poly(2,12)">32<td onclick="poly(2,13)">16
+<tr><th>3<td onclick="poly(3,0)">87381.<span style="text-decoration:overline">3</span><td onclick="poly(3,1)">43690.<span style="text-decoration:overline">6</span><td onclick="poly(3,2)">21845.<span style="text-decoration:overline">3</span><td onclick="poly(3,3)">10922.<span style="text-decoration:overline">6</span><td onclick="poly(3,4)">5461.<span style="text-decoration:overline">3</span><td onclick="poly(3,5)">2730.<span style="text-decoration:overline">6</span><td onclick="poly(3,6)">1365.<span style="text-decoration:overline">3</span><td onclick="poly(3,7)">682.<span style="text-decoration:overline">6</span><td onclick="poly(3,8)">341.<span style="text-decoration:overline">3</span><td onclick="poly(3,9)">170.<span style="text-decoration:overline">6</span><td onclick="poly(3,10)">85.<span style="text-decoration:overline">3</span><td onclick="poly(3,11)">42.<span style="text-decoration:overline">6</span><td onclick="poly(3,12)">21.<span style="text-decoration:overline">3</span><td onclick="poly(3,13)">10.<span style="text-decoration:overline">6</span>
+<tr><th>4<td onclick="poly(4,0)">65536<td onclick="poly(4,1)">32768<td onclick="poly(4,2)">16384<td onclick="poly(4,3)">8192<td onclick="poly(4,4)">4096<td onclick="poly(4,5)">2048<td onclick="poly(4,6)">1024<td onclick="poly(4,7)">512<td onclick="poly(4,8)">256<td onclick="poly(4,9)">128<td onclick="poly(4,10)">64<td onclick="poly(4,11)">32<td onclick="poly(4,12)">16<td onclick="poly(4,13)">8
+<tr><th>5<td onclick="poly(5,0)">52428.8<td onclick="poly(5,1)">26214.4<td onclick="poly(5,2)">13107.2<td onclick="poly(5,3)">6553.6<td onclick="poly(5,4)">3276.8<td onclick="poly(5,5)">1638.4<td onclick="poly(5,6)">819.2<td onclick="poly(5,7)">409.6<td onclick="poly(5,8)">204.8<td onclick="poly(5,9)">102.4<td onclick="poly(5,10)">51.2<td onclick="poly(5,11)">25.6<td onclick="poly(5,12)">12.8<td onclick="poly(5,13)">6.4
+<tr><th>6<td onclick="poly(6,0)">43690.<span style="text-decoration:overline">6</span><td onclick="poly(6,1)">21845.<span style="text-decoration:overline">3</span><td onclick="poly(6,2)">10922.<span style="text-decoration:overline">6</span><td onclick="poly(6,3)">5461.<span style="text-decoration:overline">3</span><td onclick="poly(6,4)">2730.<span style="text-decoration:overline">6</span><td onclick="poly(6,5)">1365.<span style="text-decoration:overline">3</span><td onclick="poly(6,6)">682.<span style="text-decoration:overline">6</span><td onclick="poly(6,7)">341.<span style="text-decoration:overline">3</span><td onclick="poly(6,8)">170.<span style="text-decoration:overline">6</span><td onclick="poly(6,9)">85.<span style="text-decoration:overline">3</span><td onclick="poly(6,10)">42.<span style="text-decoration:overline">6</span><td onclick="poly(6,11)">21.<span style="text-decoration:overline">3</span><td onclick="poly(6,12)">10.<span style="text-decoration:overline">6</span><td onclick="poly(6,13)">5.<span style="text-decoration:overline">3</span>
+<tr><th>7<td onclick="poly(7,0)">~37449.1<td onclick="poly(7,1)">~18724.6<td onclick="poly(7,2)">~9362.3<td onclick="poly(7,3)">~4681.1<td onclick="poly(7,4)">~2340.6<td onclick="poly(7,5)">~1170.3<td onclick="poly(7,6)">~585.1<td onclick="poly(7,7)">~292.6<td onclick="poly(7,8)">~146.3<td onclick="poly(7,9)">~73.1<td onclick="poly(7,10)">~36.6<td onclick="poly(7,11)">~18.3<td onclick="poly(7,12)">~9.1<td onclick="poly(7,13)">~4.6
+</table>
+
+<div id="formcontainer"></div>
+
+<p>Created by <a href="https://github.com/daid">daid</a>, extended by <a href="https://github.com/nummacway/">numma_cway</a>. Find this on <a href="https://github.com/daid/gbsfx-studio/">GitHub</a>!</p>
